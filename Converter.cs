@@ -42,6 +42,7 @@ public sealed class Converter
 
     public void Convert(string input, string outputDir, ConvertTarget target)
     {
+        if (Extractor.IsNup(input)) throw new NotSupportedException(L.F("nupNoConvert", Path.GetFileName(input)));
         string ext = target == ConvertTarget.Nsp ? ".nsp" : ".nsz";
         string output = Path.Combine(outputDir, Path.GetFileNameWithoutExtension(input) + ext);
         if (Path.GetFullPath(output).Equals(Path.GetFullPath(input), StringComparison.OrdinalIgnoreCase))

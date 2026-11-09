@@ -373,7 +373,7 @@ public sealed class MainForm : Form
         };
 
         string err =
-            !File.Exists(o.ProdKeys) ? L.T("errProd") :
+            !File.Exists(o.ProdKeys) && !new[] { o.BaseFile, o.UpdateFile }.Concat(o.DlcFiles).Where(f => f != "").All(Extractor.IsNup) ? L.T("errProd") :
             o.TitleKeys != "" && !File.Exists(o.TitleKeys) ? L.T("errTitle") :
             o.BaseFile == "" && o.UpdateFile == "" && o.DlcFiles.Count == 0 ? L.T("errNoInput") :
             new[] { o.BaseFile, o.UpdateFile }.Concat(o.DlcFiles).Any(f => f != "" && !File.Exists(f)) ? L.T("errMissing") :

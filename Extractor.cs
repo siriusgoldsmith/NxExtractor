@@ -50,18 +50,29 @@ public sealed class Extractor : IDisposable
         _log = log;
         _progress = progress;
         _keys = KeySet.CreateDefaultKeySet();
-        ExternalKeyReader.ReadKeyFile(_keys, o.ProdKeys,
-            string.IsNullOrWhiteSpace(o.TitleKeys) ? null : o.TitleKeys, null, (IProgressReport)null);
+        // Los .nup ya vienen descifrados: sin claves se pueden extraer igual.
+        if (File.Exists(o.ProdKeys))
+            ExternalKeyReader.ReadKeyFile(_keys, o.ProdKeys,
+                string.IsNullOrWhiteSpace(o.TitleKeys) ? null : o.TitleKeys, null, (IProgressReport)null);
     }
+
+    public static bool IsNup(string path) => path.EndsWith(".nup", StringComparison.OrdinalIgnoreCase);
 
     public void Run()
     {
         _tempDir = Path.Combine(_o.OutputDir, ".nxextractor_tmp");
         Directory.CreateDirectory(_tempDir);
 
-        if (!string.IsNullOrEmpty(_o.BaseFile)) Load(_o.BaseFile, SourceKind.Base);
-        if (!string.IsNullOrEmpty(_o.UpdateFile)) Load(_o.UpdateFile, SourceKind.Update);
-        foreach (var d in _o.DlcFiles) Load(d, SourceKind.Dlc);
+        var inputs = new List<(string path, SourceKind kind)>();
+        if (!string.IsNullOrEmpty(_o.BaseFile)) inputs.Add((_o.BaseFile, SourceKind.Base));
+        if (!string.IsNullOrEmpty(_o.UpdateFile)) inputs.Add((_o.UpdateFile, SourceKind.Update));
+        inputs.AddRange(_o.DlcFiles.Select(d => (d, SourceKind.Dlc)));
+
+        foreach (var (path, kind) in inputs)
+        {
+            if (IsNup(path)) ExtractNup(path);
+            else Load(path, kind);
+        }
 
         // Las NCAs de un update llevan el mismo Title ID que el base (sólo el cnmt usa ...800);
         // se distinguen porque su RomFS es un parche BKTR.
@@ -83,6 +94,65 @@ public sealed class Extractor : IDisposable
         if (_o.DlcRomFs) ExtractDlcs();
 
         _log(L.T("logDone"));
+    }
+
+    // ---------- NUP (Switch 2) ----------
+
+    private void ExtractNup(string path)
+    {
+        _log(L.F("logOpening", "NUP", Path.GetFileName(path)));
+        using var nup = new NupPackage(path);
+        foreach (var t in nup.Titles)
+            _log(L.F("logNupTitle", t.Index, t.Id.ToString("X16"), t.Version));
+
+        // Si hay varios títulos (base + update), el más nuevo trae el juego completo.
+        var title = nup.Titles.OrderByDescending(t => t.Version).First();
+        string dir = GameDir(title.Id);
+        _log(L.F("logNupExtracting", title.Id.ToString("X16"), title.Version));
+
+        var parts = new List<(string name, uint root)>();
+        if (_o.ExeFs) parts.Add(("exefs", title.ExeFs));
+        if (_o.RomFs) parts.Add(("romfs", title.RomFs));
+
+        foreach (var (part, root) in parts)
+        {
+            var files = nup.Walk(root).ToList();
+            string outRoot = Path.Combine(dir, part);
+            _log(L.F("logExtracting", $"{part} ({files.Count})", outRoot));
+            _progress?.SetTotal(Math.Max(1, files.Sum(f => f.rec.Size)));
+            long done = 0;
+            foreach (var (rel, rec) in files)
+            {
+                string dst = SafeJoin(outRoot, rel);
+                Directory.CreateDirectory(Path.GetDirectoryName(dst)!);
+                using (var fs = new FileStream(dst, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 20))
+                    nup.CopyTo(rec, rel, fs, n => { done += n; _progress?.Report(done); });
+            }
+        }
+    }
+
+    private static readonly HashSet<string> WindowsDevices = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+    };
+
+    /// <summary>Une una ruta del paquete bajo root, rechazando "..", nombres inválidos o dispositivos de Windows.</summary>
+    private static string SafeJoin(string root, string rel)
+    {
+        var parts = rel.Split('/');
+        foreach (var p in parts)
+        {
+            if (p.Length == 0 || p == "." || p == ".." || p.EndsWith(' ') || p.EndsWith('.') ||
+                p.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || WindowsDevices.Contains(p.Split('.')[0].TrimEnd()))
+                throw new InvalidDataException(L.F("unsafePath", rel));
+        }
+        string full = Path.GetFullPath(Path.Combine(root, Path.Combine(parts)));
+        string rootFull = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        if (!full.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException(L.F("unsafePath", rel));
+        return full;
     }
 
     private static bool IsPatch(Nca nca)

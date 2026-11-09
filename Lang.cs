@@ -39,11 +39,11 @@ public static class L
         ["filterKeys"] = new[] { "Keys (*.keys)|*.keys|All files (*.*)|*.*", "Keys (*.keys)|*.keys|Todos (*.*)|*.*", "Clés (*.keys)|*.keys|Tous les fichiers (*.*)|*.*", "キー (*.keys)|*.keys|すべてのファイル (*.*)|*.*", "Schlüssel (*.keys)|*.keys|Alle Dateien (*.*)|*.*" },
         ["filterRoms"] = new[]
         {
-            "Switch ROMs (*.nsp;*.nsz;*.xci;*.xcz)|*.nsp;*.nsz;*.xci;*.xcz|All files (*.*)|*.*",
-            "Roms de Switch (*.nsp;*.nsz;*.xci;*.xcz)|*.nsp;*.nsz;*.xci;*.xcz|Todos (*.*)|*.*",
-            "ROM Switch (*.nsp;*.nsz;*.xci;*.xcz)|*.nsp;*.nsz;*.xci;*.xcz|Tous les fichiers (*.*)|*.*",
-            "Switch ROM (*.nsp;*.nsz;*.xci;*.xcz)|*.nsp;*.nsz;*.xci;*.xcz|すべてのファイル (*.*)|*.*",
-            "Switch-ROMs (*.nsp;*.nsz;*.xci;*.xcz)|*.nsp;*.nsz;*.xci;*.xcz|Alle Dateien (*.*)|*.*"
+            "Switch ROMs (*.nsp;*.nsz;*.xci;*.xcz;*.nup)|*.nsp;*.nsz;*.xci;*.xcz;*.nup|All files (*.*)|*.*",
+            "Roms de Switch (*.nsp;*.nsz;*.xci;*.xcz;*.nup)|*.nsp;*.nsz;*.xci;*.xcz;*.nup|Todos (*.*)|*.*",
+            "ROM Switch (*.nsp;*.nsz;*.xci;*.xcz;*.nup)|*.nsp;*.nsz;*.xci;*.xcz;*.nup|Tous les fichiers (*.*)|*.*",
+            "Switch ROM (*.nsp;*.nsz;*.xci;*.xcz;*.nup)|*.nsp;*.nsz;*.xci;*.xcz;*.nup|すべてのファイル (*.*)|*.*",
+            "Switch-ROMs (*.nsp;*.nsz;*.xci;*.xcz;*.nup)|*.nsp;*.nsz;*.xci;*.xcz;*.nup|Alle Dateien (*.*)|*.*"
         },
         ["tabExtract"] = new[] { "Extract", "Extraer", "Extraire", "展開", "Extrahieren" },
         ["tabConvert"] = new[] { "Convert", "Convertir", "Convertir", "変換", "Konvertieren" },
@@ -106,6 +106,12 @@ public static class L
         ["logCompressing"] = new[] { "  Compressing {0} (level {1})", "  Comprimiendo {0} (nivel {1})", "  Compression de {0} (niveau {1})", "  {0} を圧縮中 (レベル {1})", "  Komprimiere {0} (Stufe {1})" },
         ["logCopying"] = new[] { "  Copying {0}", "  Copiando {0}", "  Copie de {0}", "  {0} をコピー中", "  Kopiere {0}" },
         ["tooManyFiles"] = new[] { "Too many files for the PFS0 header.", "Demasiados archivos para la cabecera PFS0.", "Trop de fichiers pour l’en-tête PFS0.", "PFS0 ヘッダーに対してファイルが多すぎます。", "Zu viele Dateien für den PFS0-Header." },
+        ["badNup"] = new[] { "Not a valid NUP package.", "No es un paquete NUP válido.", "Ce n’est pas un paquet NUP valide.", "有効な NUP パッケージではありません。", "Kein gültiges NUP-Paket." },
+        ["logNupTitle"] = new[] { "  Title {0}: {1} v{2}", "  Título {0}: {1} v{2}", "  Titre {0} : {1} v{2}", "  タイトル {0}: {1} v{2}", "  Titel {0}: {1} v{2}" },
+        ["logNupExtracting"] = new[] { "Game {0} v{1} (Switch 2, already decrypted)", "Juego {0} v{1} (Switch 2, ya descifrado)", "Jeu {0} v{1} (Switch 2, déjà déchiffré)", "ゲーム {0} v{1} (Switch 2、復号済み)", "Spiel {0} v{1} (Switch 2, bereits entschlüsselt)" },
+        ["nupBadFrame"] = new[] { "{0}: decompressed to {1} bytes, {2} expected", "{0}: se descomprimió a {1} bytes, se esperaban {2}", "{0} : décompressé en {1} octets, {2} attendus", "{0}: 解凍後 {1} バイト ({2} バイトのはず)", "{0}: auf {1} Bytes entpackt, {2} erwartet" },
+        ["unsafePath"] = new[] { "Unsafe path in the package: {0}", "Ruta no segura en el paquete: {0}", "Chemin dangereux dans le paquet : {0}", "パッケージ内に安全でないパスがあります: {0}", "Unsichere Pfadangabe im Paket: {0}" },
+        ["nupNoConvert"] = new[] { "{0}: NUP files (Switch 2) can only be extracted, not converted.", "{0}: los NUP (Switch 2) sólo se pueden extraer, no convertir.", "{0} : les NUP (Switch 2) peuvent seulement être extraits, pas convertis.", "{0}: NUP (Switch 2) は展開のみ可能で、変換はできません。", "{0}: NUP-Dateien (Switch 2) können nur extrahiert, nicht konvertiert werden." },
         ["converted"] = new[] { "converted", "convertido", "converti", "変換済み", "konvertiert" },
     };
 }

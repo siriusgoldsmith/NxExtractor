@@ -1,0 +1,14 @@
+bin/
+obj/
+dist/
+*.user
+.vs/
+
+# Never commit keys or game files
+*.keys
+*.nsp
+*.nsz
+*.xci
+*.xcz
+*.nca
+*.ncz

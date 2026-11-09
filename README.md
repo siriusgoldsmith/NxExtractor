@@ -1,8 +1,15 @@
 # NX Extractor
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/icon-dark.png">
+  <img src="docs/icon.png" alt="NX Extractor icon" width="96">
+</picture>
+
 A simple Windows tool to extract and convert Nintendo Switch game dumps — no command line, no emulator required.
 
 *Español más abajo.*
+
+![NX Extractor screenshot](docs/screenshot.png)
 
 ## Features
 

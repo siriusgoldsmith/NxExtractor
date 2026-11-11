@@ -148,12 +148,12 @@ public sealed class Converter
     {
         if (!Directory.Exists(folder)) throw new InvalidDataException(L.T("errNotFolder"));
         var packages = NupWriter.Detect(folder);
-        var top = packages.Last();
+        var top = packages.Last(p => p.Kind != NupFormat.KindAddon);
         string name = $"{new DirectoryInfo(folder).Name} [{top.TitleId:X16}][v{top.Version}].nup";
         string output = Path.Combine(outputDir, name);
         _log($"{folder} -> {name}");
         foreach (var p in packages)
-            _log(L.F("logNupPkg", L.T(p.Kind == NupFormat.KindBase ? "kindBaseNup" : "kindUpdateNup"), p.TitleId.ToString("X16"),
+            _log(L.F("logNupPkg", L.T(p.Kind == NupFormat.KindBase ? "kindBaseNup" : p.Kind == NupFormat.KindAddon ? "kindDlc" : "kindUpdateNup"), p.TitleId.ToString("X16"),
                 p.Version, p.ExeFsDir != null ? "✓" : "-", p.RomFsDir != null ? "✓" : "-"));
         try
         {

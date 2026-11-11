@@ -482,6 +482,7 @@ public sealed class MainForm : Form
         private readonly Control _owner;
         private readonly ProgressBar _bar;
         private long _total, _value;
+        private int _shown = -1;
 
         public UiProgress(Control owner, ProgressBar bar) { _owner = owner; _bar = bar; }
 
@@ -494,6 +495,9 @@ public sealed class MainForm : Form
         {
             if (_total <= 0) return;
             int v = (int)Math.Clamp(_value * 1000 / _total, 0, 1000);
+            // Sólo cuando cambia la barra: con miles de archivos pequeños, no saturar la interfaz.
+            if (v == _shown) return;
+            _shown = v;
             _owner.BeginInvoke(() => _bar.Value = v);
         }
     }

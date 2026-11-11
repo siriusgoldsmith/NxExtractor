@@ -266,6 +266,24 @@ public sealed class NupWriter
         if (!list.Any(p => p.Kind == NupFormat.KindBase))
             foreach (var p in list) p.Flags = 0x01;
 
+        // DLC: "dlc/<title id en hex>/<versión>/romfs". El Title ID sale del nombre de la carpeta.
+        string dlc = Path.Combine(folder, "dlc");
+        if (Directory.Exists(dlc))
+        {
+            foreach (var idDir in Directory.GetDirectories(dlc))
+            {
+                if (!ulong.TryParse(Path.GetFileName(idDir), System.Globalization.NumberStyles.HexNumber, null, out ulong dlcId)) continue;
+                foreach (var verDir in Directory.GetDirectories(idDir))
+                {
+                    if (!uint.TryParse(Path.GetFileName(verDir), out uint v)) continue;
+                    var p = FromDir(verDir, v, NupFormat.KindAddon);
+                    if (p == null) continue;
+                    p.TitleId = dlcId;
+                    list.Add(p);
+                }
+            }
+        }
+
         return list.OrderBy(p => p.Kind).ThenBy(p => p.Version).ToList();
     }
 
@@ -341,15 +359,48 @@ public sealed class NupWriter
         output.Position = blobOffset;
 
         // ---------- Datos ----------
+        // Los archivos pequeños se leen y comprimen en paralelo por lotes; se escriben en orden.
         long done = 0;
+        var batch = new List<FileEntry>();
+        long batchBytes = 0;
+        using var compressors = new ThreadLocal<Compressor>(() => new Compressor(Level), trackAllValues: true);
+
+        void FlushBatch()
+        {
+            if (batch.Count == 0) return;
+            var payloads = new byte[batch.Count][];
+            Parallel.For(0, batch.Count, i => payloads[i] = PrepareSmallFile(batch[i], compressors.Value));
+            for (int i = 0; i < batch.Count; i++)
+            {
+                var f = batch[i];
+                output.Position = NupFormat.Align16(output.Position);
+                f.Offset = output.Position;
+                output.Write(payloads[i]);
+                done += f.Size;
+            }
+            _progress?.Report(done);
+            batch.Clear();
+            batchBytes = 0;
+        }
+
         foreach (var f in allFiles)
         {
             if (f.Size == 0) { f.Offset = 0; f.StoredSize = 0; f.Codec = NupFormat.CodecRaw; f.Sha256 = SHA256.HashData(Array.Empty<byte>()); continue; }
+            if (f.Size <= SmallFileLimit)
+            {
+                batch.Add(f);
+                batchBytes += f.Size;
+                if (batchBytes >= BatchLimit || batch.Count >= 4096) FlushBatch();
+                continue;
+            }
+            FlushBatch();
             output.Position = NupFormat.Align16(output.Position);
             f.Offset = output.Position;
-            f.Codec = Compress && ShouldCompress(f) ? NupFormat.CodecZstd : NupFormat.CodecRaw;
-            WriteFile(f, output, ref done);
+            f.Codec = WantsCompression(f) && SampleCompresses(f) ? NupFormat.CodecZstd : NupFormat.CodecRaw;
+            WriteLargeFile(f, output, ref done);
         }
+        FlushBatch();
+        foreach (var c in compressors.Values) c.Dispose();
 
         // ---------- Metadatos (TLV con el NPDM) ----------
         var meta = new (long off, uint size)[packages.Count];
@@ -447,30 +498,60 @@ public sealed class NupWriter
         var d = new Dir { Name = name };
         foreach (var sub in Directory.GetDirectories(path)) d.SubDirs.Add(Scan(sub, Path.GetFileName(sub)));
         foreach (var file in Directory.GetFiles(path))
-            d.Files.Add(new FileEntry { Name = Path.GetFileName(file), SourcePath = file, Size = new FileInfo(file).Length });
+            if (!IsDumperArtifact(Path.GetFileName(file))) d.Files.Add(new FileEntry { Name = Path.GetFileName(file), SourcePath = file, Size = new FileInfo(file).Length });
         return d;
     }
+
+    // ".listing" son listados de directorio que deja el FTP (wget) al copiar el dump; no son del juego.
+    private static bool IsDumperArtifact(string name) => name.Equals(".listing", StringComparison.OrdinalIgnoreCase);
 
     // Lo que ya viene comprimido (zstd del juego, vídeo, audio) se guarda tal cual.
     private static readonly HashSet<string> RawExtensions = new(StringComparer.OrdinalIgnoreCase)
         { ".zs", ".zst", ".webm", ".mp4", ".bwav", ".bfstm", ".bfwav", ".png", ".jpg", ".jpeg", ".ogg", ".opus" };
 
-    private bool ShouldCompress(FileEntry f)
+    private bool WantsCompression(FileEntry f) =>
+        Compress && f.Size >= 64 && !RawExtensions.Contains(Path.GetExtension(f.Name));
+
+    // Hasta 16 MiB un archivo se procesa entero en memoria; los lotes paralelos se limitan a 256 MiB.
+    private const int SmallFileLimit = 16 << 20;
+    private const long BatchLimit = 256L << 20;
+    private readonly byte[] _buf = new byte[4 << 20];
+
+    /// <summary>
+    /// Archivo pequeño (se llama en paralelo): se lee entero, se calcula su SHA-256 y se comprime en memoria.
+    /// Devuelve los bytes a escribir: comprimidos si ocupan menos, si no el archivo tal cual.
+    /// </summary>
+    private byte[] PrepareSmallFile(FileEntry f, Compressor compressor)
     {
-        if (f.Size < 64 || RawExtensions.Contains(Path.GetExtension(f.Name))) return false;
-        // Muestra: si el primer MiB casi no comprime, el archivo se guarda sin comprimir.
-        using var src = File.OpenRead(f.SourcePath);
-        var sample = new byte[(int)Math.Min(1 << 20, f.Size)];
-        src.ReadExactly(sample);
-        using var c = new Compressor(1);
-        return c.Wrap(sample).Length < sample.Length * 0.95;
+        var data = File.ReadAllBytes(f.SourcePath);
+        if (data.Length != f.Size) throw new IOException(L.F("nupReadChanged", f.SourcePath));
+        f.Sha256 = SHA256.HashData(data);
+        f.Codec = NupFormat.CodecRaw;
+        f.StoredSize = data.Length;
+        if (!WantsCompression(f)) return data;
+
+        var packed = compressor.Wrap(data);
+        if (packed.Length >= data.Length) return data;
+        f.Codec = NupFormat.CodecZstd;
+        f.StoredSize = packed.Length;
+        return packed.ToArray();
     }
 
-    private void WriteFile(FileEntry f, FileStream output, ref long done)
+    // Muestra: si el primer MiB casi no comprime, el archivo grande se guarda sin comprimir.
+    private bool SampleCompresses(FileEntry f)
+    {
+        using var src = File.OpenRead(f.SourcePath);
+        int n = (int)Math.Min(1 << 20, f.Size);
+        src.ReadExactly(_buf, 0, n);
+        using var c = new Compressor(1);
+        return c.Wrap(_buf.AsSpan(0, n)).Length < n * 0.95;
+    }
+
+    private void WriteLargeFile(FileEntry f, FileStream output, ref long done)
     {
         using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         using var src = new FileStream(f.SourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20);
-        var buf = new byte[4 << 20];
+        var buf = _buf;
         long start = output.Position;
         int n;
         if (f.Codec == NupFormat.CodecZstd)
@@ -496,7 +577,7 @@ public sealed class NupWriter
                 output.Position = start;
                 output.SetLength(start);
                 f.Codec = NupFormat.CodecRaw;
-                WriteFile(f, output, ref done);
+                WriteLargeFile(f, output, ref done);
                 return;
             }
         }

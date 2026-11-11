@@ -17,7 +17,7 @@ using Path = System.IO.Path;
 
 namespace NxExtractor;
 
-public enum ConvertTarget { Nsp, Nsz }
+public enum ConvertTarget { Nsp, Nsz, Nup }
 
 /// <summary>
 /// Convierte XCI/XCZ/NSP/NSZ a NSP (NCAs sin comprimir) o NSZ (NCAs comprimidas como NCZ).
@@ -34,14 +34,17 @@ public sealed class Converter
     public Converter(string prodKeys, string titleKeys, Action<string> log, IProgressReport progress)
     {
         _keys = KeySet.CreateDefaultKeySet();
-        ExternalKeyReader.ReadKeyFile(_keys, prodKeys,
-            string.IsNullOrWhiteSpace(titleKeys) ? null : titleKeys, null, (IProgressReport)null);
+        // Empaquetar a NUP no necesita claves (el contenido ya está descifrado).
+        if (File.Exists(prodKeys))
+            ExternalKeyReader.ReadKeyFile(_keys, prodKeys,
+                string.IsNullOrWhiteSpace(titleKeys) ? null : titleKeys, null, (IProgressReport)null);
         _log = log;
         _progress = progress;
     }
 
     public void Convert(string input, string outputDir, ConvertTarget target)
     {
+        if (target == ConvertTarget.Nup) { PackNup(input, outputDir); return; }
         if (Extractor.IsNup(input)) throw new NotSupportedException(L.F("nupNoConvert", Path.GetFileName(input)));
         string ext = target == ConvertTarget.Nsp ? ".nsp" : ".nsz";
         string output = Path.Combine(outputDir, Path.GetFileNameWithoutExtension(input) + ext);
@@ -138,6 +141,30 @@ public sealed class Converter
             foreach (var d in Enumerable.Reverse(keepAlive)) try { d.Dispose(); } catch { }
             try { Directory.Delete(tempDir, true); } catch { }
         }
+    }
+
+    /// <summary>Carpeta extraída (exefs/ + romfs/, o base/ + updates/&lt;versión&gt;/) -> .nup</summary>
+    private void PackNup(string folder, string outputDir)
+    {
+        if (!Directory.Exists(folder)) throw new InvalidDataException(L.T("errNotFolder"));
+        var packages = NupWriter.Detect(folder);
+        var top = packages.Last();
+        string name = $"{new DirectoryInfo(folder).Name} [{top.TitleId:X16}][v{top.Version}].nup";
+        string output = Path.Combine(outputDir, name);
+        _log($"{folder} -> {name}");
+        foreach (var p in packages)
+            _log(L.F("logNupPkg", L.T(p.Kind == NupFormat.KindBase ? "kindBaseNup" : "kindUpdateNup"), p.TitleId.ToString("X16"),
+                p.Version, p.ExeFsDir != null ? "✓" : "-", p.RomFsDir != null ? "✓" : "-"));
+        try
+        {
+            new NupWriter(_log, _progress).Write(packages, output);
+        }
+        catch
+        {
+            try { File.Delete(output); } catch { }
+            throw;
+        }
+        _log($"  OK ({new FileInfo(output).Length / (1024 * 1024)} MiB)");
     }
 
     private static bool IsContent(string name) =>

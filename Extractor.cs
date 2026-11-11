@@ -105,18 +105,31 @@ public sealed class Extractor : IDisposable
         foreach (var t in nup.Titles)
             _log(L.F("logNupTitle", t.Index, t.Id.ToString("X16"), t.Version));
 
-        // Si hay varios títulos (base + update), el más nuevo trae el juego completo.
-        var title = nup.Titles.OrderByDescending(t => t.Version).First();
-        string dir = GameDir(title.Id);
-        _log(L.F("logNupExtracting", title.Id.ToString("X16"), title.Version));
+        // Igual que el emulador: el ExeFS es el del título más nuevo que lo tenga, y el RomFS es el
+        // del base con los updates encima (cada archivo, el de la versión más nueva).
+        var titles = nup.Titles.Where(t => t.Kind != NupFormat.KindAddon)
+            .OrderBy(t => t.Kind).ThenBy(t => t.Version).ToList();
+        if (titles.Count == 0) throw new InvalidDataException(L.T("badNup"));
+        var newest = titles.Last();
+        string dir = GameDir(newest.Id);
+        _log(L.F("logNupExtracting", newest.Id.ToString("X16"), newest.Version));
 
-        var parts = new List<(string name, uint root)>();
-        if (_o.ExeFs) parts.Add(("exefs", title.ExeFs));
-        if (_o.RomFs) parts.Add(("romfs", title.RomFs));
-
-        foreach (var (part, root) in parts)
+        var parts = new List<(string name, List<(string path, NupPackage.FileRec rec)> files)>();
+        if (_o.ExeFs)
         {
-            var files = nup.Walk(root).ToList();
+            var exeTitle = titles.LastOrDefault(t => t.ExeFs != NupFormat.None);
+            if (exeTitle != null) parts.Add(("exefs", nup.Walk(exeTitle.ExeFs).ToList()));
+        }
+        if (_o.RomFs)
+        {
+            var merged = new Dictionary<string, NupPackage.FileRec>(StringComparer.Ordinal);
+            foreach (var t in titles)
+                foreach (var (p, r) in nup.Walk(t.RomFs)) merged[p] = r;
+            if (merged.Count > 0) parts.Add(("romfs", merged.Select(kv => (kv.Key, kv.Value)).ToList()));
+        }
+
+        foreach (var (part, files) in parts)
+        {
             string outRoot = Path.Combine(dir, part);
             _log(L.F("logExtracting", $"{part} ({files.Count})", outRoot));
             _progress?.SetTotal(Math.Max(1, files.Sum(f => f.rec.Size)));

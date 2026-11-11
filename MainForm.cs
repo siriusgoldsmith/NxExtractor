@@ -199,6 +199,7 @@ public sealed class MainForm : Form
         var filesGroup = Loc(new GroupBox { Dock = DockStyle.Fill, Padding = new Padding(8) }, "filesGroup");
         var btns = new FlowLayoutPanel { Dock = DockStyle.Right, FlowDirection = FlowDirection.TopDown, Width = 120 };
         var add = Loc(new Button { Width = 110 }, "add");
+        var addFolder = Loc(new Button { Width = 110 }, "addFolder");
         var rem = Loc(new Button { Width = 110 }, "remove");
         var clr = Loc(new Button { Width = 110 }, "clearList");
         add.Click += (_, _) =>
@@ -206,21 +207,27 @@ public sealed class MainForm : Form
             using var d = new OpenFileDialog { Filter = L.T("filterRoms"), Multiselect = true };
             if (d.ShowDialog(this) == DialogResult.OK) files.Items.AddRange(d.FileNames);
         };
+        addFolder.Click += (_, _) =>
+        {
+            using var d = new FolderBrowserDialog();
+            if (d.ShowDialog(this) == DialogResult.OK) files.Items.Add(d.SelectedPath);
+        };
         rem.Click += (_, _) => { foreach (var i in files.SelectedItems.Cast<object>().ToList()) files.Items.Remove(i); };
         clr.Click += (_, _) => files.Items.Clear();
         files.DragEnter += (_, e) => e.Effect = e.Data!.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
         files.DragDrop += (_, e) => files.Items.AddRange((string[])e.Data!.GetData(DataFormats.FileDrop)!);
-        btns.Controls.AddRange(new Control[] { add, rem, clr });
+        btns.Controls.AddRange(new Control[] { add, addFolder, rem, clr });
         filesGroup.Controls.Add(files);
         filesGroup.Controls.Add(btns);
         root.Controls.Add(filesGroup);
 
         var toNsp = Loc(new RadioButton { Checked = true, AutoSize = true }, "toNsp");
         var toNsz = Loc(new RadioButton { AutoSize = true }, "toNsz");
+        var toNup = Loc(new RadioButton { AutoSize = true }, "toNup");
         var level = new NumericUpDown { Minimum = 1, Maximum = 22, Value = 18, Width = 60 };
         var levelLbl = Loc(new Label { AutoSize = true, Margin = new Padding(16, 6, 0, 0) }, "zstdLevel");
         var modeRow = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
-        modeRow.Controls.AddRange(new Control[] { toNsp, toNsz, levelLbl, level });
+        modeRow.Controls.AddRange(new Control[] { toNsp, toNsz, toNup, levelLbl, level });
         toNsz.CheckedChanged += (_, _) => level.Enabled = levelLbl.Enabled = toNsz.Checked;
         level.Enabled = levelLbl.Enabled = false;
         root.Controls.Add(Group("conversion", new Control[] { modeRow, Row("outputFolder", _convOut, BrowseFolder(_convOut)) }));
@@ -255,14 +262,16 @@ public sealed class MainForm : Form
         {
             var inputs = files.Items.Cast<string>().ToList();
             string outDir = _convOut.Text.Trim();
+            bool nup = toNup.Checked;
             string err =
-                !File.Exists(_prod.Text.Trim()) ? L.T("errProd") :
+                !nup && !File.Exists(_prod.Text.Trim()) ? L.T("errProd") :
                 inputs.Count == 0 ? L.T("errNoFiles") :
-                inputs.Any(f => !File.Exists(f)) ? L.T("errMissing") :
+                nup && inputs.Any(f => !Directory.Exists(f)) ? L.T("errNotFolder") :
+                !nup && inputs.Any(f => !File.Exists(f)) ? L.T("errMissing") :
                 outDir == "" ? L.T("errOut") : null;
             if (err != null) { MessageBox.Show(this, err, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
 
-            var target = toNsz.Checked ? ConvertTarget.Nsz : ConvertTarget.Nsp;
+            var target = nup ? ConvertTarget.Nup : toNsz.Checked ? ConvertTarget.Nsz : ConvertTarget.Nsp;
             SaveSettings();
             go.Enabled = false;
             log.Clear();

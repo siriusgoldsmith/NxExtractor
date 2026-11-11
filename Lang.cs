@@ -123,6 +123,28 @@ public static class L
         ["errNotFolder"] = new[] { "For Folder → NUP, add extracted game folders (with exefs/ and romfs/), not files.", "Para Carpeta → NUP añade carpetas de juegos extraídos (con exefs/ y romfs/), no archivos.", "Pour Dossier → NUP, ajoutez des dossiers de jeux extraits (avec exefs/ et romfs/), pas des fichiers.", "フォルダー → NUP では、ファイルではなく展開済みゲームのフォルダー (exefs/ と romfs/ を含む) を追加してください。", "Für Ordner → NUP bitte entpackte Spielordner (mit exefs/ und romfs/) hinzufügen, keine Dateien." },
         ["kindBaseNup"] = new[] { "Base", "Base", "Base", "ベース", "Basis" },
         ["kindUpdateNup"] = new[] { "Update", "Update", "Mise à jour", "アップデート", "Update" },
+        ["tabFirmware"] = new[] { "Firmware", "Firmware", "Firmware", "ファームウェア", "Firmware" },
+        ["fwTarget"] = new[] { "Target firmware", "Firmware destino", "Firmware cible", "対象ファームウェア", "Ziel-Firmware" },
+        ["fwTargetItem"] = new[] { "{0} or newer (keygen {1})", "{0} o superior (keygen {1})", "{0} ou plus récent (keygen {1})", "{0} 以降 (keygen {1})", "{0} oder neuer (Keygen {1})" },
+        ["fwPatchRsv"] = new[] { "Also lower RequiredSystemVersion", "Bajar también RequiredSystemVersion", "Abaisser aussi RequiredSystemVersion", "RequiredSystemVersion も下げる", "Auch RequiredSystemVersion senken" },
+        ["fwPatchBtn"] = new[] { "Patch", "Parchear", "Patcher", "パッチ", "Patchen" },
+        ["fwNote"] = new[]
+        {
+            "Makes games run on older firmware: re-encrypts NCA keys for the chosen key generation, removes titlekey crypto and lowers the minimum system version. Output is an NSP. Needs sigpatches on the console. Games that use newer system features may still crash.",
+            "Hace que los juegos corran en firmware más viejo: re-cifra las claves de las NCA para la generación elegida, quita el cifrado por titlekey y baja la versión mínima del sistema. La salida es un NSP. La consola necesita sigpatches. Un juego que use funciones del sistema más nuevas puede cerrarse igual.",
+            "Permet de lancer des jeux sur un firmware plus ancien : rechiffre les clés des NCA pour la génération choisie, supprime le chiffrement par titlekey et abaisse la version système minimale. La sortie est un NSP. La console a besoin de sigpatches. Un jeu qui utilise des fonctions système plus récentes peut quand même planter.",
+            "古いファームウェアでゲームを動かします: NCA の鍵を選んだ世代で再暗号化し、titlekey 暗号を外し、必要なシステムバージョンを下げます。出力は NSP です。本体に sigpatches が必要です。新しいシステム機能を使うゲームは動かない場合があります。",
+            "Lässt Spiele auf älterer Firmware laufen: verschlüsselt die NCA-Schlüssel für die gewählte Generation neu, entfernt die Titlekey-Verschlüsselung und senkt die minimale Systemversion. Ausgabe ist ein NSP. Die Konsole braucht Sigpatches. Spiele, die neuere Systemfunktionen nutzen, können trotzdem abstürzen."
+        },
+        ["fwMissingKeys"] = new[] { "Your prod.keys has no keys for key generation {0}.", "Tu prod.keys no tiene claves para la generación {0}.", "Votre prod.keys n’a pas de clés pour la génération {0}.", "prod.keys に世代 {0} の鍵がありません。", "Deine prod.keys enthält keine Schlüssel für Generation {0}." },
+        ["fwSkipNca"] = new[] { "  {0}: not an NCA3, copied unchanged", "  {0}: no es NCA3, se copia sin cambios", "  {0} : pas un NCA3, copié tel quel", "  {0}: NCA3 ではないため、そのままコピーします", "  {0}: kein NCA3, unverändert kopiert" },
+        ["fwNoTitleKey"] = new[] { "{0}: needs a ticket/titlekey that was not found.", "{0}: necesita un ticket/titlekey que no se encontró.", "{0} : nécessite un ticket/titlekey introuvable.", "{0}: 必要なチケット/titlekey が見つかりません。", "{0}: benötigt ein Ticket/einen Titlekey, der nicht gefunden wurde." },
+        ["fwLogNca"] = new[] { "  {0}: keygen {1} → {2}{3}", "  {0}: keygen {1} → {2}{3}", "  {0} : keygen {1} → {2}{3}", "  {0}: keygen {1} → {2}{3}", "  {0}: Keygen {1} → {2}{3}" },
+        ["fwRightsRemoved"] = new[] { " (titlekey → standard crypto)", " (titlekey → cifrado estándar)", " (titlekey → chiffrement standard)", " (titlekey → 標準暗号)", " (Titlekey → Standardverschlüsselung)" },
+        ["fwBadMeta"] = new[] { "Unsupported Meta NCA layout.", "Formato de Meta NCA no soportado.", "Format de NCA Meta non pris en charge.", "未対応の Meta NCA 形式です。", "Nicht unterstütztes Meta-NCA-Format." },
+        ["fwLogRsv"] = new[] { "  RequiredSystemVersion {0} → {1}", "  RequiredSystemVersion {0} → {1}", "  RequiredSystemVersion {0} → {1}", "  RequiredSystemVersion {0} → {1}", "  RequiredSystemVersion {0} → {1}" },
+        ["fwDoneLog"] = new[] { "Finished: {0}/{1} patched.", "Terminado: {0}/{1} parcheados.", "Terminé : {0}/{1} patchés.", "完了: {0}/{1} 件パッチしました。", "Fertig: {0}/{1} gepatcht." },
+        ["fwDoneMsg"] = new[] { "{0} of {1} files patched. Open the output folder?", "{0} de {1} archivos parcheados. ¿Abrir la carpeta de salida?", "{0} fichier(s) sur {1} patché(s). Ouvrir le dossier de sortie ?", "{1} 件中 {0} 件をパッチしました。出力フォルダーを開きますか?", "{0} von {1} Dateien gepatcht. Ausgabeordner öffnen?" },
         ["converted"] = new[] { "converted", "convertido", "converti", "変換済み", "konvertiert" },
     };
 }

@@ -30,6 +30,11 @@ A simple Windows tool to extract and convert Nintendo Switch game dumps — no c
 - Extracted Switch 2 game folder → `.nup` (`exefs/` + `romfs/`, or `base/` + `updates/<version>/` + `dlc/<id>/<version>/`), readable by Lichii / Eglantine
 - Batch conversion, drag & drop
 
+**Firmware patch** (run newer games on older firmware)
+- Re-encrypts NCA keys for an older key generation, converts titlekey crypto to standard crypto (no ticket needed) and lowers the cnmt RequiredSystemVersion
+- Unlike most tools, the content IDs and hashes in the cnmt are updated too, so the output NSP stays consistent
+- Input: NSP, NSZ, XCI, XCZ → output NSP. Needs sigpatches; games that use newer system features may still crash
+
 **Other**
 - Single self-contained `.exe` (no .NET install needed)
 - Interface in English, Español, Français, 日本語 and Deutsch
@@ -71,7 +76,7 @@ dotnet publish -c Release -o dist
 
 ## Credits
 
-Built on [LibHac](https://github.com/Thealexbarney/LibHac) and [ZstdSharp](https://github.com/oleg-st/ZstdSharp).
+Built on [LibHac](https://github.com/Thealexbarney/LibHac) and [ZstdSharp](https://github.com/oleg-st/ZstdSharp). The firmware patch follows the algorithm of [NSC_Builder](https://github.com/julesontheroad/NSC_Builder) (MIT). The NUP format follows the reader in [Lichii](https://github.com/zortos293/Lichii/tree/nx2) / [Eglantine](https://github.com/Eglantine-Community/Eglantine).
 
 ---
 
@@ -81,6 +86,7 @@ Herramienta para Windows que extrae y convierte dumps de juegos de Nintendo Swit
 
 - **Extraer:** ExeFS, RomFS (con el update aplicado), RomFS de DLC y `control.nacp` con iconos, desde NSP, NSZ, XCI o XCZ. También ExeFS y RomFS de paquetes `.nup` de Switch 2 (ya descifrados, sin claves).
 - **Convertir:** XCI/XCZ → NSP, NSZ → NSP, NSP/XCI → NSZ, por lotes. Y carpetas de juegos de Switch 2 extraídos → `.nup`.
+- **Firmware:** parchea juegos (NSP/NSZ/XCI) para que corran en firmware más viejo: re-cifra las claves para una generación anterior, quita el cifrado por titlekey y baja el RequiredSystemVersion. Necesita sigpatches.
 - Un solo `.exe`, sin instalar nada. Interfaz en 5 idiomas.
 
 Las claves (`prod.keys` y `title.keys`) las pones tú, sacadas de tu propia consola. La herramienta no incluye claves ni juegos.

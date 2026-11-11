@@ -58,6 +58,7 @@ public sealed class MainForm : Form
         var extractTab = Loc(new TabPage(), "tabExtract");
         tabs.TabPages.Add(extractTab);
         tabs.TabPages.Add(BuildConvertTab());
+        tabs.TabPages.Add(BuildFirmwareTab());
 
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, Padding = new Padding(6) };
         extractTab.Controls.Add(root);
@@ -133,6 +134,7 @@ public sealed class MainForm : Form
     {
         SuspendLayout();
         foreach (var (control, key) in _localized) control.Text = L.T(key);
+        foreach (var refresh in _onLanguage) refresh();
         _langBtn.Text = "🌐 " + L.CurrentName;
         ResumeLayout(true);
     }
@@ -304,6 +306,130 @@ public sealed class MainForm : Form
         return page;
     }
 
+    // ---------- Pestaña Firmware ----------
+
+    private readonly TextBox _fwOut = new();
+    private readonly List<Action> _onLanguage = new();
+
+    private TabPage BuildFirmwareTab()
+    {
+        var page = Loc(new TabPage(), "tabFirmware");
+        var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, Padding = new Padding(6) };
+        page.Controls.Add(root);
+
+        var note = Loc(new Label { AutoSize = true, Dock = DockStyle.Fill, MaximumSize = new Size(740, 0), Margin = new Padding(3, 0, 3, 6), ForeColor = SystemColors.GrayText }, "fwNote");
+        root.Controls.Add(note);
+
+        var files = new ListBox { Dock = DockStyle.Fill, SelectionMode = SelectionMode.MultiExtended, IntegralHeight = false, AllowDrop = true };
+        var filesGroup = Loc(new GroupBox { Dock = DockStyle.Fill, Padding = new Padding(8) }, "filesGroup");
+        var btns = new FlowLayoutPanel { Dock = DockStyle.Right, FlowDirection = FlowDirection.TopDown, Width = 120 };
+        var add = Loc(new Button { Width = 110 }, "add");
+        var rem = Loc(new Button { Width = 110 }, "remove");
+        var clr = Loc(new Button { Width = 110 }, "clearList");
+        add.Click += (_, _) =>
+        {
+            using var d = new OpenFileDialog { Filter = L.T("filterRoms"), Multiselect = true };
+            if (d.ShowDialog(this) == DialogResult.OK) files.Items.AddRange(d.FileNames);
+        };
+        rem.Click += (_, _) => { foreach (var i in files.SelectedItems.Cast<object>().ToList()) files.Items.Remove(i); };
+        clr.Click += (_, _) => files.Items.Clear();
+        files.DragEnter += (_, e) => e.Effect = e.Data!.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
+        files.DragDrop += (_, e) => files.Items.AddRange((string[])e.Data!.GetData(DataFormats.FileDrop)!);
+        btns.Controls.AddRange(new Control[] { add, rem, clr });
+        filesGroup.Controls.Add(files);
+        filesGroup.Controls.Add(btns);
+        root.Controls.Add(filesGroup);
+
+        var target = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300 };
+        void FillTargets()
+        {
+            int sel = target.SelectedIndex < 0 ? Array.FindIndex(FirmwarePatcher.Targets, t => t.KeyGen == 11) : target.SelectedIndex;
+            target.Items.Clear();
+            foreach (var t in FirmwarePatcher.Targets) target.Items.Add(L.F("fwTargetItem", t.Firmware, t.KeyGen));
+            target.SelectedIndex = sel;
+        }
+        _onLanguage.Add(FillTargets);
+        var targetRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, AutoSize = true };
+        targetRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170));
+        targetRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        targetRow.Controls.Add(Loc(new Label { AutoSize = true, Anchor = AnchorStyles.Left }, "fwTarget"));
+        targetRow.Controls.Add(target);
+        var rsv = Loc(new CheckBox { Checked = true, AutoSize = true }, "fwPatchRsv");
+        root.Controls.Add(Group("conversion", new Control[] { targetRow, rsv, Row("outputFolder", _fwOut, BrowseFolder(_fwOut)) }));
+
+        var bar = new ProgressBar { Dock = DockStyle.Fill, Maximum = 1000 };
+        var go = Loc(new Button { Height = 36, Dock = DockStyle.Fill }, "fwPatchBtn");
+        var actions = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2 };
+        actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        actions.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
+        actions.Controls.Add(bar, 0, 0);
+        actions.Controls.Add(go, 1, 0);
+        root.Controls.Add(actions);
+
+        var log = new TextBox
+        {
+            Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Dock = DockStyle.Fill,
+            Font = new Font("Consolas", 9f), BackColor = SystemColors.Window
+        };
+        root.Controls.Add(log);
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 150));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        void Log(string m)
+        {
+            if (log.InvokeRequired) { log.BeginInvoke(() => Log(m)); return; }
+            log.AppendText(m + Environment.NewLine);
+        }
+
+        go.Click += async (_, _) =>
+        {
+            var inputs = files.Items.Cast<string>().ToList();
+            string outDir = _fwOut.Text.Trim();
+            string err =
+                !File.Exists(_prod.Text.Trim()) ? L.T("errProd") :
+                inputs.Count == 0 ? L.T("errNoFiles") :
+                inputs.Any(f => !File.Exists(f)) ? L.T("errMissing") :
+                outDir == "" ? L.T("errOut") : null;
+            if (err != null) { MessageBox.Show(this, err, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+
+            int keyGen = FirmwarePatcher.Targets[target.SelectedIndex].KeyGen;
+            bool patchRsv = rsv.Checked;
+            SaveSettings();
+            go.Enabled = false;
+            log.Clear();
+            int ok = 0;
+            try
+            {
+                Directory.CreateDirectory(outDir);
+                var patcher = new FirmwarePatcher(_prod.Text.Trim(), _title.Text.Trim(), Log, new UiProgress(this, bar))
+                    { TargetKeyGen = keyGen, PatchRequiredSystemVersion = patchRsv };
+                await Task.Run(() =>
+                {
+                    foreach (var f in inputs)
+                    {
+                        try { patcher.Patch(f, outDir); ok++; }
+                        catch (Exception ex) { Log($"  ERROR: {ex.Message}"); }
+                    }
+                });
+                bar.Value = bar.Maximum;
+                Log(L.F("fwDoneLog", ok, inputs.Count));
+                if (MessageBox.Show(this, L.F("fwDoneMsg", ok, inputs.Count), Text,
+                        MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
+                    System.Diagnostics.Process.Start("explorer.exe", outDir);
+            }
+            catch (Exception ex)
+            {
+                Log("ERROR: " + ex.Message);
+                MessageBox.Show(this, ex.Message, L.T("error"), MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally { go.Enabled = true; }
+        };
+        return page;
+    }
+
     // ---------- UI helpers ----------
 
     private GroupBox Group(string titleKey, Control[] rows)
@@ -426,6 +552,7 @@ public sealed class MainForm : Form
         public string Title { get; set; } = "";
         public string Out { get; set; } = "";
         public string ConvOut { get; set; } = "";
+        public string FwOut { get; set; } = "";
         public string Lang { get; set; } = "en";
     }
 
@@ -445,7 +572,7 @@ public sealed class MainForm : Form
     private void LoadSettings()
     {
         var s = ReadSettings();
-        _prod.Text = s.Prod; _title.Text = s.Title; _out.Text = s.Out; _convOut.Text = s.ConvOut;
+        _prod.Text = s.Prod; _title.Text = s.Title; _out.Text = s.Out; _convOut.Text = s.ConvOut; _fwOut.Text = s.FwOut;
 
         // Si no hay nada guardado, buscar las claves en las rutas habituales.
         if (_prod.Text == "")
@@ -464,6 +591,7 @@ public sealed class MainForm : Form
         }
         if (_out.Text == "") _out.Text = Path.Combine(AppContext.BaseDirectory, "extracted");
         if (_convOut.Text == "") _convOut.Text = Path.Combine(AppContext.BaseDirectory, "converted");
+        if (_fwOut.Text == "") _fwOut.Text = Path.Combine(AppContext.BaseDirectory, "patched");
     }
 
     private void SaveSettings()
@@ -472,7 +600,7 @@ public sealed class MainForm : Form
         {
             Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
             File.WriteAllText(SettingsPath, JsonSerializer.Serialize(new Settings
-            { Prod = _prod.Text, Title = _title.Text, Out = _out.Text, ConvOut = _convOut.Text, Lang = L.Current }));
+            { Prod = _prod.Text, Title = _title.Text, Out = _out.Text, ConvOut = _convOut.Text, FwOut = _fwOut.Text, Lang = L.Current }));
         }
         catch { }
     }

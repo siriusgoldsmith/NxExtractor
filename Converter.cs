@@ -285,7 +285,8 @@ public sealed class Pfs0Writer
     // y la tabla de nombres se rellena con ceros hasta el inicio de los datos.
     private const int ReservedHeader = 0x8000;
 
-    public void AddFile(string name, Action<Stream> writeData)
+    /// <summary>Añade un archivo y devuelve su índice (para poder renombrarlo cuando se conozca su hash).</summary>
+    public int AddFile(string name, Action<Stream> writeData)
     {
         if (_dataStart < 0)
         {
@@ -295,7 +296,10 @@ public sealed class Pfs0Writer
         long start = _out.Position;
         writeData(_out);
         _files.Add((name, start - _dataStart, _out.Position - start));
+        return _files.Count - 1;
     }
+
+    public void Rename(int index, string name) => _files[index] = (name, _files[index].offset, _files[index].size);
 
     public void Finish()
     {

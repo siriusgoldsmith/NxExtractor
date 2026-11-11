@@ -35,6 +35,9 @@ A simple Windows tool to extract and convert Nintendo Switch game dumps — no c
 - Unlike most tools, the content IDs and hashes in the cnmt are updated too, so the output NSP stays consistent
 - Input: NSP, NSZ, XCI, XCZ → output NSP. Needs sigpatches; games that use newer system features may still crash
 
+> [!WARNING]
+> The firmware patch has only been tested on an emulator (Eglantine, with an older firmware and keys limited to that firmware), not on a real console. If something goes wrong, please report it as a bug in [Issues](../../issues).
+
 **Other**
 - Single self-contained `.exe` (no .NET install needed)
 - Interface in English, Español, Français, 日本語 and Deutsch
@@ -86,7 +89,7 @@ Herramienta para Windows que extrae y convierte dumps de juegos de Nintendo Swit
 
 - **Extraer:** ExeFS, RomFS (con el update aplicado), RomFS de DLC y `control.nacp` con iconos, desde NSP, NSZ, XCI o XCZ. También ExeFS y RomFS de paquetes `.nup` de Switch 2 (ya descifrados, sin claves).
 - **Convertir:** XCI/XCZ → NSP, NSZ → NSP, NSP/XCI → NSZ, por lotes. Y carpetas de juegos de Switch 2 extraídos → `.nup`.
-- **Firmware:** parchea juegos (NSP/NSZ/XCI) para que corran en firmware más viejo: re-cifra las claves para una generación anterior, quita el cifrado por titlekey y baja el RequiredSystemVersion. Necesita sigpatches.
+- **Firmware:** parchea juegos (NSP/NSZ/XCI) para que corran en firmware más viejo: re-cifra las claves para una generación anterior, quita el cifrado por titlekey y baja el RequiredSystemVersion. Necesita sigpatches. Solo probado en emulador; si algo falla, repórtalo en Issues.
 - Un solo `.exe`, sin instalar nada. Interfaz en 5 idiomas.
 
 Las claves (`prod.keys` y `title.keys`) las pones tú, sacadas de tu propia consola. La herramienta no incluye claves ni juegos.

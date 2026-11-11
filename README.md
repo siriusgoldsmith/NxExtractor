@@ -27,7 +27,7 @@ A simple Windows tool to extract and convert Nintendo Switch game dumps — no c
 - XCI / XCZ → NSP
 - NSZ → NSP
 - NSP / XCI → NSZ (zstd level 1–22)
-- Extracted Switch 2 game folder → `.nup` (`exefs/` + `romfs/`, or `base/` + `updates/<version>/`), readable by Lichii / Eglantine
+- Extracted Switch 2 game folder → `.nup` (`exefs/` + `romfs/`, or `base/` + `updates/<version>/` + `dlc/<id>/<version>/`), readable by Lichii / Eglantine
 - Batch conversion, drag & drop
 
 **Other**

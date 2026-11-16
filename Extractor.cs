@@ -119,42 +119,54 @@ public sealed class Extractor : IDisposable
         foreach (var t in nup.Titles)
             _log(L.F("logNupTitle", t.Index, t.Id.ToString("X16"), t.Version));
 
-        // Igual que el emulador: el ExeFS es el del título más nuevo que lo tenga, y el RomFS es el
-        // del base con los updates encima (cada archivo, el de la versión más nueva).
-        var titles = nup.Titles.Where(t => t.Kind != NupFormat.KindAddon)
-            .OrderBy(t => t.Kind).ThenBy(t => t.Version).ToList();
-        if (titles.Count == 0) throw new InvalidDataException(L.T("badNup"));
-        var newest = titles.Last();
-        string dir = GameDir(newest.Id);
-        _log(L.F("logNupExtracting", newest.Id.ToString("X16"), newest.Version));
+        // Cada programa por separado (un Switch 2 Edition trae varios: el nativo y el "legacy"). Igual que el
+        // emulador: el ExeFS es el del título más nuevo que lo tenga, y el RomFS es el del base con los updates
+        // del mismo Title ID encima (cada archivo, el de la versión más nueva).
+        var programs = nup.Titles.Where(t => t.Kind != NupFormat.KindAddon)
+            .GroupBy(t => t.Id).Select(g => g.OrderBy(t => t.Kind).ThenBy(t => t.Version).ToList()).ToList();
+        var addons = nup.Titles.Where(t => t.Kind == NupFormat.KindAddon && t.RomFs != NupFormat.None).ToList();
+        if (programs.Count == 0 && addons.Count == 0) throw new InvalidDataException(L.T("badNup"));
 
-        var parts = new List<(string name, List<(string path, NupPackage.FileRec rec)> files)>();
-        if (_o.ExeFs)
+        foreach (var titles in programs)
         {
-            var exeTitle = titles.LastOrDefault(t => t.ExeFs != NupFormat.None);
-            if (exeTitle != null) parts.Add(("exefs", nup.Walk(exeTitle.ExeFs).ToList()));
-        }
-        if (_o.RomFs)
-        {
-            var merged = new Dictionary<string, NupPackage.FileRec>(StringComparer.Ordinal);
-            foreach (var t in titles)
-                foreach (var (p, r) in nup.Walk(t.RomFs)) merged[p] = r;
-            if (merged.Count > 0) parts.Add(("romfs", merged.Select(kv => (kv.Key, kv.Value)).ToList()));
-        }
-
-        foreach (var (part, files) in parts)
-        {
-            string outRoot = Path.Combine(dir, part);
-            _log(L.F("logExtracting", $"{part} ({files.Count})", outRoot));
-            _progress?.SetTotal(Math.Max(1, files.Sum(f => f.rec.Size)));
-            long done = 0;
-            foreach (var (rel, rec) in files)
+            var newest = titles.Last();
+            string dir = GameDir(newest.Id);
+            _log(L.F("logNupExtracting", newest.Id.ToString("X16"), newest.Version));
+            if (_o.ExeFs)
             {
-                string dst = SafeJoin(outRoot, rel);
-                Directory.CreateDirectory(Path.GetDirectoryName(dst)!);
-                using (var fs = new FileStream(dst, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 20))
-                    nup.CopyTo(rec, rel, fs, n => { done += n; _progress?.Report(done); });
+                var exeTitle = titles.LastOrDefault(t => t.ExeFs != NupFormat.None);
+                if (exeTitle != null) WriteNupFiles(nup, nup.Walk(exeTitle.ExeFs).ToList(), Path.Combine(dir, "exefs"), "exefs");
             }
+            if (_o.RomFs)
+            {
+                var merged = new Dictionary<string, NupPackage.FileRec>(StringComparer.Ordinal);
+                foreach (var t in titles.Where(t => t.RomFs != NupFormat.None))
+                    foreach (var (p, r) in nup.Walk(t.RomFs)) merged[p] = r;
+                if (merged.Count > 0) WriteNupFiles(nup, merged.Select(kv => (kv.Key, kv.Value)).ToList(), Path.Combine(dir, "romfs"), "romfs");
+            }
+        }
+
+        // Addons (DLC, o el contenido extra de un Switch 2 Edition): igual que los DLC de NSP.
+        if (_o.DlcRomFs)
+            foreach (var t in addons)
+            {
+                ulong appId = (t.Id - 0x1000) & ~0xFFFUL;
+                WriteNupFiles(nup, nup.Walk(t.RomFs).ToList(),
+                    Path.Combine(GameDir(appId), "dlc", t.Id.ToString("X16"), "romfs"), $"DLC {t.Id:X16}");
+            }
+    }
+
+    private void WriteNupFiles(NupPackage nup, List<(string path, NupPackage.FileRec rec)> files, string outRoot, string label)
+    {
+        _log(L.F("logExtracting", $"{label} ({files.Count})", outRoot));
+        _progress?.SetTotal(Math.Max(1, files.Sum(f => f.rec.Size)));
+        long done = 0;
+        foreach (var (rel, rec) in files)
+        {
+            string dst = SafeJoin(outRoot, rel);
+            Directory.CreateDirectory(Path.GetDirectoryName(dst)!);
+            using (var fs = new FileStream(dst, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 20))
+                nup.CopyTo(rec, rel, fs, n => { done += n; _progress?.Report(done); });
         }
     }
 
